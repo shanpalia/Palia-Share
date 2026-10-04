@@ -51,8 +51,8 @@ jobs:
           permissions='''<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />\n    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />'''
           s=s.replace(marker, permissions)
           s=s.replace('android:label="palia_share"','android:label="Palia Share"')
+          import re
           if 'android:icon=' in s:
-              import re
               s=re.sub(r'android:icon="[^"]+"', 'android:icon="@drawable/ic_palia_share"', s, count=1)
           else:
               s=s.replace('<application ', '<application android:icon="@drawable/ic_palia_share" ', 1)
@@ -60,7 +60,7 @@ jobs:
 
           icon=Path('android/app/src/main/res/drawable/ic_palia_share.xml')
           icon.parent.mkdir(parents=True, exist_ok=True)
-          icon.write_text('''<?xml version="1.0" encoding="utf-8"?>\n<vector xmlns:android="http://schemas.android.com/apk/res/android"\n    android:width="108dp"\n    android:height="108dp"\n    android:viewportWidth="108"\n    android:viewportHeight="108">\n    <path android:fillColor="#18B78A" android:pathData="M54,4 C26.386,4 4,26.386 4,54 C4,81.614 26.386,104 54,104 C81.614,104 104,81.614 104,54 C104,26.386 81.614,4 54,4 Z" />\n    <path android:fillColor="#FFFFFFFF" android:pathData="M54,49 A7,7 0,1 0,54,63 A7,7 0,1 0,54,49 Z M25,67 A7,7 0,1 0,25,81 A7,7 0,1 0,25,67 Z M83,25 A7,7 0,1 0,83,39 A7,7 0,1 0,83,25 Z" />\n    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="5" android:strokeLineCap="round" android:fillColor="@android:color/transparent" android:pathData="M31,69 L48,59 M60,52 L77,37" />\n</vector>\n''')
+          icon.write_text('''<?xml version="1.0" encoding="utf-8"?>\n<vector xmlns:android="http://schemas.android.com/apk/res/android"\n    android:width="108dp"\n    android:height="108dp"\n    android:viewportWidth="512"\n    android:viewportHeight="512">\n    <path android:fillColor="#FFFFFFFF" android:pathData="M136,32 L376,32 C433.44,32 480,78.56 480,136 L480,376 C480,433.44 433.44,480 376,480 L136,480 C78.56,480 32,433.44 32,376 L32,136 C32,78.56 78.56,32 136,32 Z" />\n    <path android:fillColor="#263238" android:pathData="M160,145 C132,145 110,167 110,195 L110,317 C110,345 132,367 160,367 L208,367 L208,318 L180,318 C172,318 166,312 166,304 L166,208 C166,200 172,194 180,194 L208,194 L208,145 Z" />\n    <path android:fillColor="#263238" android:pathData="M352,145 L304,145 L304,194 L332,194 C340,194 346,200 346,208 L346,304 C346,312 340,318 332,318 L304,318 L304,367 L352,367 C380,367 402,345 402,317 L402,195 C402,167 380,145 352,145 Z" />\n    <path android:strokeColor="#18B78A" android:strokeWidth="24" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="@android:color/transparent" android:pathData="M186,256 L326,256 M291,206 L341,256 L291,306" />\n</vector>\n''')
           PY
       - name: Get dependencies
         run: flutter pub get
