@@ -26,6 +26,20 @@ jobs:
         run: |
           flutter create --platforms=android --project-name=palia_share --org=com.shanpalia /tmp/palia_android
           cp -R /tmp/palia_android/android .
+      - name: Configure Android SDK versions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for p in Path('android').rglob('*'):
+              if p.is_file() and p.suffix in {'.gradle', '.kts'}:
+                  s=p.read_text()
+                  s=s.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 36')
+                  s=s.replace('compileSdk flutter.compileSdkVersion', 'compileSdk 36')
+                  s=s.replace('targetSdk = flutter.targetSdkVersion', 'targetSdk = 36')
+                  s=s.replace('targetSdk flutter.targetSdkVersion', 'targetSdk 36')
+                  p.write_text(s)
+          PY
+          echo "Configured Android compileSdk/targetSdk to 36"
       - name: Configure Android manifest
         run: |
           python3 - <<'PY'
