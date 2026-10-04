@@ -40,7 +40,7 @@ jobs:
           p = Path('lib/main.dart')
           s = p.read_text()
           old = "Text('Developer by Shanpalia'), SizedBox(height: 8), Text('Version 1.0.0')"
-          new = "Text('Developer by Shanpalia'), SizedBox(height: 6), Text('By PaliaAPK HUB', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF18B78A))), SizedBox(height: 8), Text('Version 1.0.0')"
+          new = "Text('Developer by Shanpalia'), SizedBox(height: 6), Text('By PaliaAPK HUB', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF31B895))), SizedBox(height: 8), Text('Version 1.0.0')"
           if old in s:
               s = s.replace(old, new, 1)
           p.write_text(s)
@@ -77,11 +77,11 @@ jobs:
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="108dp" android:height="108dp"
               android:viewportWidth="512" android:viewportHeight="512">
-              <path android:fillColor="#263238" android:pathData="M112,0 L400,0 C462,0 512,50 512,112 L512,400 C512,462 462,512 400,512 L112,512 C50,512 0,462 0,400 L0,112 C0,50 50,0 112,0 Z" />
-              <path android:fillColor="#BDBDBD" android:pathData="M184,112 L328,112 C368,112 400,144 400,184 L400,328 C400,368 368,400 328,400 L184,400 C144,400 112,368 112,328 L112,184 C112,144 144,112 184,112 Z" />
-              <path android:fillColor="#263238" android:pathData="M160,112 L232,112 L232,184 L184,184 L184,328 L232,328 L232,400 L160,400 C133,400 112,379 112,352 L112,160 C112,133 133,112 160,112 Z" />
-              <path android:fillColor="#263238" android:pathData="M352,112 L280,112 L280,184 L328,184 L328,328 L280,328 L280,400 L352,400 C379,400 400,379 400,352 L400,160 C400,133 379,112 352,112 Z" />
-              <path android:strokeColor="#18B78A" android:strokeWidth="26" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="@android:color/transparent" android:pathData="M174,256 L332,256 M298,202 L352,256 L298,310" />
+              <path android:fillColor="#273238" android:pathData="M112,0 L400,0 C462,0 512,50 512,112 L512,400 C512,462 462,512 400,512 L112,512 C50,512 0,462 0,400 L0,112 C0,50 50,0 112,0 Z" />
+              <path android:fillColor="#FFFFFF" android:pathData="M184,112 L328,112 C368,112 400,144 400,184 L400,328 C400,368 368,400 328,400 L184,400 C144,400 112,368 112,328 L112,184 C112,144 144,112 184,112 Z" />
+              <path android:fillColor="#273238" android:pathData="M160,112 L232,112 L232,184 L184,184 L184,328 L232,328 L232,400 L160,400 C133,400 112,379 112,352 L112,160 C112,133 133,112 160,112 Z" />
+              <path android:fillColor="#273238" android:pathData="M352,112 L280,112 L280,184 L328,184 L328,328 L280,328 L280,400 L352,400 C379,400 400,379 400,352 L400,160 C400,133 379,112 352,112 Z" />
+              <path android:strokeColor="#31B895" android:strokeWidth="26" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="@android:color/transparent" android:pathData="M174,256 L332,256 M298,202 L352,256 L298,310" />
           </vector>
           ''')
           PY
