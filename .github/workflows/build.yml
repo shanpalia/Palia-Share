@@ -11,21 +11,25 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
       - name: Setup Java 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           flutter-version: '3.44.4'
           cache: true
+
       - name: Generate Android project
         run: |
           flutter create --platforms=android --project-name=palia_share --org=com.shanpalia /tmp/palia_android
           cp -R /tmp/palia_android/android .
+
       - name: Configure Android SDK versions
         run: |
           python3 - <<'PY'
@@ -33,28 +37,65 @@ jobs:
           for p in Path('android').rglob('*'):
               if p.is_file() and p.suffix in {'.gradle', '.kts'}:
                   s=p.read_text()
-                  s=s.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 36')
-                  s=s.replace('compileSdk flutter.compileSdkVersion', 'compileSdk 36')
-                  s=s.replace('targetSdk = flutter.targetSdkVersion', 'targetSdk = 36')
-                  s=s.replace('targetSdk flutter.targetSdkVersion', 'targetSdk 36')
+                  replacements = {
+                      'compileSdk = flutter.compileSdkVersion': 'compileSdk = 36',
+                      'compileSdk flutter.compileSdkVersion': 'compileSdk 36',
+                      'targetSdk = flutter.targetSdkVersion': 'targetSdk = 36',
+                      'targetSdk flutter.targetSdkVersion': 'targetSdk 36',
+                  }
+                  for old, new in replacements.items():
+                      s=s.replace(old, new)
                   p.write_text(s)
           PY
-          echo "Configured Android compileSdk/targetSdk to 36"
+          echo "Configured app compileSdk/targetSdk to 36"
+
       - name: Configure Android manifest
         run: |
           python3 - <<'PY'
           p='android/app/src/main/AndroidManifest.xml'
           s=open(p).read()
-          s=s.replace('<manifest xmlns:android="http://schemas.android.com/apk/res/android">','<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />\n    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />')
+          marker='<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
+          permissions='''<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />\n    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />'''
+          s=s.replace(marker, permissions)
           s=s.replace('android:label="palia_share"','android:label="Palia Share"')
           open(p,'w').write(s)
           PY
+
       - name: Get dependencies
         run: flutter pub get
+
+      - name: Force Android compileSdk 36 for Flutter plugins
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path('/home/runner/.pub-cache/hosted/pub.dev')
+          changed = 0
+          for p in root.glob('*/android/*'):
+              if p.is_file() and p.suffix in {'.gradle', '.kts'}:
+                  s = p.read_text()
+                  original = s
+                  s = s.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 36')
+                  s = s.replace('compileSdk flutter.compileSdkVersion', 'compileSdk 36')
+                  s = s.replace('compileSdk = 34', 'compileSdk = 36')
+                  s = s.replace('compileSdk 34', 'compileSdk 36')
+                  if s != original:
+                      p.write_text(s)
+                      changed += 1
+          print(f'Updated {changed} plugin Gradle files to compileSdk 36')
+          PY
+
+      - name: Verify Android SDK
+        run: |
+          grep -R "compileSdk" android | head -20 || true
+          echo "Android SDK platforms installed:"
+          ls -d "$ANDROID_HOME/platforms/android-"* | tail -10 || true
+
       - name: Analyze
         run: flutter analyze
+
       - name: Build debug APK
         run: flutter build apk --debug
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
