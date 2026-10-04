@@ -41,16 +41,26 @@ jobs:
                   }.items(): s=s.replace(old,new)
                   p.write_text(s)
           PY
-      - name: Configure Android manifest permissions
+      - name: Configure Android manifest permissions and Palia Share icon
         run: |
           python3 - <<'PY'
-          p='android/app/src/main/AndroidManifest.xml'
-          s=open(p).read()
+          from pathlib import Path
+          p=Path('android/app/src/main/AndroidManifest.xml')
+          s=p.read_text()
           marker='<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
           permissions='''<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />\n    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />'''
           s=s.replace(marker, permissions)
           s=s.replace('android:label="palia_share"','android:label="Palia Share"')
-          open(p,'w').write(s)
+          if 'android:icon=' in s:
+              import re
+              s=re.sub(r'android:icon="[^"]+"', 'android:icon="@drawable/ic_palia_share"', s, count=1)
+          else:
+              s=s.replace('<application ', '<application android:icon="@drawable/ic_palia_share" ', 1)
+          p.write_text(s)
+
+          icon=Path('android/app/src/main/res/drawable/ic_palia_share.xml')
+          icon.parent.mkdir(parents=True, exist_ok=True)
+          icon.write_text('''<?xml version="1.0" encoding="utf-8"?>\n<vector xmlns:android="http://schemas.android.com/apk/res/android"\n    android:width="108dp"\n    android:height="108dp"\n    android:viewportWidth="108"\n    android:viewportHeight="108">\n    <path android:fillColor="#18B78A" android:pathData="M54,4 C26.386,4 4,26.386 4,54 C4,81.614 26.386,104 54,104 C81.614,104 104,81.614 104,54 C104,26.386 81.614,4 54,4 Z" />\n    <path android:fillColor="#FFFFFFFF" android:pathData="M54,49 A7,7 0,1 0,54,63 A7,7 0,1 0,54,49 Z M25,67 A7,7 0,1 0,25,81 A7,7 0,1 0,25,67 Z M83,25 A7,7 0,1 0,83,39 A7,7 0,1 0,83,25 Z" />\n    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="5" android:strokeLineCap="round" android:fillColor="@android:color/transparent" android:pathData="M31,69 L48,59 M60,52 L77,37" />\n</vector>\n''')
           PY
       - name: Get dependencies
         run: flutter pub get
