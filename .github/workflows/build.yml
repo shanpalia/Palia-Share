@@ -1,120 +1,103 @@
 name: Build Palia Share APK
+
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
+
 permissions:
   contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
       - name: Setup Java 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           flutter-version: '3.44.4'
           cache: true
+
       - name: Generate Android project
         run: |
           flutter create --platforms=android --project-name=palia_share --org=com.shanpalia /tmp/palia_android
           cp -R /tmp/palia_android/android .
-      - name: Configure Android SDK versions
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          for p in Path('android').rglob('*'):
-              if p.is_file() and p.suffix in {'.gradle', '.kts'}:
-                  s=p.read_text()
-                  for old,new in {
-                    'compileSdk = flutter.compileSdkVersion':'compileSdk = 36',
-                    'compileSdk flutter.compileSdkVersion':'compileSdk 36',
-                    'targetSdk = flutter.targetSdkVersion':'targetSdk = 36',
-                    'targetSdk flutter.targetSdkVersion':'targetSdk 36',
-                  }.items(): s=s.replace(old,new)
-                  p.write_text(s)
-          PY
-      - name: Apply Palia Share branding
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('lib/main.dart')
-          s=p.read_text()
-          s=s.replace("Text('Developer by Shanpalia'), SizedBox(height: 8), Text('Version 1.0.0')", "Text('Developer by Shanpalia'), SizedBox(height: 6), Text('By PaliaAPK HUB', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF18B78A))), SizedBox(height: 8), Text('Version 1.0.0')")
-          p.write_text(s)
-          PY
-      - name: Configure Android manifest permissions and Palia Share icon
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('android/app/src/main/AndroidManifest.xml')
-          s=p.read_text()
-          marker='<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
-          permissions='''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />'''
-          s=s.replace(marker, permissions)
-          s=s.replace('android:label="palia_share"','android:label="Palia Share"')
-          import re
-          if 'android:icon=' in s:
-              s=re.sub(r'android:icon="[^"]+"', 'android:icon="@drawable/ic_palia_share"', s, count=1)
-          else:
-              s=s.replace('<application ', '<application android:icon="@drawable/ic_palia_share" ', 1)
-          p.write_text(s)
 
-          icon=Path('android/app/src/main/res/drawable/ic_palia_share.xml')
+      - name: Configure Android SDK
+        run: |
+          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/g' android/app/build.gradle.kts
+          sed -i 's/compileSdk flutter.compileSdkVersion/compileSdk 36/g' android/app/build.gradle
+          sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 36/g' android/app/build.gradle.kts
+          sed -i 's/targetSdk flutter.targetSdkVersion/targetSdk 36/g' android/app/build.gradle
+
+      - name: Configure manifest and launcher icon
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android/app/src/main/AndroidManifest.xml')
+          s = p.read_text()
+          marker = '<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
+          perms = '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+              <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />'''
+          s = s.replace(marker, perms, 1)
+          s = s.replace('android:label="palia_share"', 'android:label="Palia Share"')
+          import re
+          s = re.sub(r'android:icon="[^"]+"', 'android:icon="@drawable/ic_palia_share"', s, count=1)
+          if 'android:icon=' not in s:
+              s = s.replace('<application ', '<application android:icon="@drawable/ic_palia_share" ', 1)
+          p.write_text(s)
+          icon = Path('android/app/src/main/res/drawable/ic_palia_share.xml')
           icon.parent.mkdir(parents=True, exist_ok=True)
           icon.write_text('''<?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="512"
-    android:viewportHeight="512">
-    <path android:fillColor="#263238" android:pathData="M112,0 L400,0 C461.86,0 512,50.14 512,112 L512,400 C512,461.86 461.86,512 400,512 L112,512 C50.14,512 0,461.86 0,400 L0,112 C0,50.14 50.14,0 112,0 Z" />
-    <path android:fillColor="#BDBDBD" android:pathData="M184,112 L328,112 C367.76,112 400,144.24 400,184 L400,328 C400,367.76 367.76,400 328,400 L184,400 C144.24,400 112,367.76 112,328 L112,184 C112,144.24 144.24,112 184,112 Z" />
-    <path android:fillColor="#263238" android:pathData="M160,112 L232,112 L232,184 L184,184 L184,328 L232,328 L232,400 L160,400 C133.49,400 112,378.51 112,352 L112,160 C112,133.49 133.49,112 160,112 Z" />
-    <path android:fillColor="#263238" android:pathData="M352,112 L280,112 L280,184 L328,184 L328,328 L280,328 L280,400 L352,400 C378.51,400 400,378.51 400,352 L400,160 C400,133.49 378.51,112 352,112 Z" />
-    <path android:strokeColor="#18B78A" android:strokeWidth="26" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="@android:color/transparent" android:pathData="M174,256 L332,256 M298,202 L352,256 L298,310" />
-</vector>
-''')
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp" android:height="108dp"
+              android:viewportWidth="512" android:viewportHeight="512">
+              <path android:fillColor="#263238" android:pathData="M112,0 L400,0 C462,0 512,50 512,112 L512,400 C512,462 462,512 400,512 L112,512 C50,512 0,462 0,400 L0,112 C0,50 50,0 112,0 Z" />
+              <path android:fillColor="#BDBDBD" android:pathData="M184,112 L328,112 C368,112 400,144 400,184 L400,328 C400,368 368,400 328,400 L184,400 C144,400 112,368 112,328 L112,184 C112,144 144,112 184,112 Z" />
+              <path android:fillColor="#263238" android:pathData="M160,112 L232,112 L232,184 L184,184 L184,328 L232,328 L232,400 L160,400 C133,400 112,379 112,352 L112,160 C112,133 133,112 160,112 Z" />
+              <path android:fillColor="#263238" android:pathData="M352,112 L280,112 L280,184 L328,184 L328,328 L280,328 L280,400 L352,400 C379,400 400,379 400,352 L400,160 C400,133 379,112 352,112 Z" />
+              <path android:strokeColor="#18B78A" android:strokeWidth="26" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="@android:color/transparent" android:pathData="M174,256 L332,256 M298,202 L352,256 L298,310" />
+          </vector>
+          ''')
           PY
+
       - name: Get dependencies
         run: flutter pub get
-      - name: Force Android compileSdk 36 for Flutter plugins
+
+      - name: Force plugin compileSdk 36
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          root=Path('/home/runner/.pub-cache/hosted/pub.dev')
-          changed=0
+          root = Path('/home/runner/.pub-cache/hosted/pub.dev')
           for p in root.glob('*/android/*'):
-              if p.is_file() and p.suffix in {'.gradle','.kts'}:
-                  s=p.read_text(); original=s
-                  for old,new in {
-                    'compileSdk = flutter.compileSdkVersion':'compileSdk = 36',
-                    'compileSdk flutter.compileSdkVersion':'compileSdk 36',
-                    'compileSdk = 34':'compileSdk = 36',
-                    'compileSdk 34':'compileSdk 36',
-                  }.items(): s=s.replace(old,new)
-                  if s!=original: p.write_text(s); changed+=1
-          print(f'Updated {changed} plugin Gradle files to compileSdk 36')
+              if p.is_file() and p.suffix in {'.gradle', '.kts'}:
+                  s = p.read_text()
+                  s = s.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 36')
+                  s = s.replace('compileSdk flutter.compileSdkVersion', 'compileSdk 36')
+                  s = s.replace('compileSdk = 34', 'compileSdk = 36')
+                  s = s.replace('compileSdk 34', 'compileSdk 36')
+                  p.write_text(s)
           PY
-      - name: Verify Android SDK
-        run: |
-          grep -R "compileSdk" android | head -20 || true
-          ls -d "$ANDROID_HOME/platforms/android-"* | tail -10 || true
+
       - name: Analyze
         run: flutter analyze
+
       - name: Build debug APK
         run: flutter build apk --debug
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
