@@ -33,6 +33,19 @@ jobs:
           flutter create --platforms=android --project-name=palia_share --org=com.shanpalia /tmp/palia_android
           cp -R /tmp/palia_android/android .
 
+      - name: Add About branding
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('lib/main.dart')
+          s = p.read_text()
+          old = "Text('Developer by Shanpalia'), SizedBox(height: 8), Text('Version 1.0.0')"
+          new = "Text('Developer by Shanpalia'), SizedBox(height: 6), Text('By PaliaAPK HUB', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF18B78A))), SizedBox(height: 8), Text('Version 1.0.0')"
+          if old in s:
+              s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+
       - name: Configure Android SDK
         run: |
           sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/g' android/app/build.gradle.kts
@@ -44,6 +57,7 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
           p = Path('android/app/src/main/AndroidManifest.xml')
           s = p.read_text()
           marker = '<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
@@ -54,9 +68,9 @@ jobs:
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />'''
           s = s.replace(marker, perms, 1)
           s = s.replace('android:label="palia_share"', 'android:label="Palia Share"')
-          import re
-          s = re.sub(r'android:icon="[^"]+"', 'android:icon="@drawable/ic_palia_share"', s, count=1)
-          if 'android:icon=' not in s:
+          if 'android:icon=' in s:
+              s = re.sub(r'android:icon="[^"]+"', 'android:icon="@drawable/ic_palia_share"', s, count=1)
+          else:
               s = s.replace('<application ', '<application android:icon="@drawable/ic_palia_share" ', 1)
           p.write_text(s)
           icon = Path('android/app/src/main/res/drawable/ic_palia_share.xml')
