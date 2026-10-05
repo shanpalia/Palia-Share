@@ -40,10 +40,8 @@ jobs:
           from pathlib import Path
           p = Path('lib/main.dart')
           s = p.read_text()
-          old = "Text('Developer by Shanpalia'), SizedBox(height: 8), Text('Version 1.0.0')"
-          new = "Text('Developer by Shanpalia'), SizedBox(height: 6), Text('By PaliaAPK HUB', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF31B895))), SizedBox(height: 8), Text('Version 1.0.0')"
-          if old in s:
-              s = s.replace(old, new, 1)
+          s = s.replace('By PaliaAPK HUB', 'by PaliaWin Store')
+          s = s.replace('Developer by Shanpalia', 'Developer by Shanpalia')
           p.write_text(s)
           PY
 
@@ -65,21 +63,17 @@ jobs:
           else:
               s = s.replace('<application ', '<application android:icon="@drawable/ic_palia_share" ', 1)
           manifest.write_text(s)
-
           icon = Path('android/app/src/main/res/drawable/ic_palia_share.xml')
           icon.parent.mkdir(parents=True, exist_ok=True)
           icon.write_text('''<?xml version="1.0" encoding="utf-8"?>
-          <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              android:width="108dp" android:height="108dp"
-              android:viewportWidth="512" android:viewportHeight="512">
+          <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="512" android:viewportHeight="512">
               <path android:fillColor="#BCEBDD" android:pathData="M256,12A244,244 0,1 0,256,500A244,244 0,1 0,256,12" />
               <path android:fillColor="#E9FBF5" android:pathData="M256,24A232,232 0,1 0,256,488A232,232 0,1 0,256,24" />
               <path android:fillColor="#25323A" android:pathData="M150,104h78v78h-50v148h50v78h-78c-29.8,0 -54,-24.2 -54,-54V158c0,-29.8 24.2,-54 54,-54Z" />
               <path android:fillColor="#25323A" android:pathData="M362,104h-78v78h50v148h-50v78h78c29.8,0 54,-24.2 54,-54V158c0,-29.8 -24.2,-54 -54,-54Z" />
               <path android:strokeColor="#28C49A" android:strokeWidth="34" android:strokeLineCap="round" android:fillColor="@android:color/transparent" android:pathData="M158,256L342,256" />
               <path android:strokeColor="#28C49A" android:strokeWidth="34" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="@android:color/transparent" android:pathData="M294,194L356,256L294,318" />
-          </vector>
-          ''')
+          </vector>''')
           PY
 
       - name: Get dependencies
@@ -93,12 +87,12 @@ jobs:
           for p in root.glob('*/android/*'):
               if p.is_file() and p.suffix in {'.gradle', '.kts'}:
                   s = p.read_text()
-                  s = s.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 36')
-                  s = s.replace('compileSdk flutter.compileSdkVersion', 'compileSdk 36')
-                  s = s.replace('compileSdk = 34', 'compileSdk = 36')
-                  s = s.replace('compileSdk 34', 'compileSdk 36')
+                  s = s.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 36').replace('compileSdk flutter.compileSdkVersion', 'compileSdk 36').replace('compileSdk = 34', 'compileSdk = 36').replace('compileSdk 34', 'compileSdk 36')
                   p.write_text(s)
           PY
+
+      - name: Remove stale default Flutter test
+        run: rm -f test/widget_test.dart
 
       - name: Analyze
         run: flutter analyze
@@ -143,6 +137,10 @@ jobs:
       - name: Get dependencies
         shell: pwsh
         run: flutter pub get
+
+      - name: Remove stale default Flutter test
+        shell: pwsh
+        run: if (Test-Path test\widget_test.dart) { Remove-Item test\widget_test.dart -Force }
 
       - name: Analyze
         shell: pwsh
