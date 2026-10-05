@@ -1,4 +1,4 @@
-name: Build Palia Share APK
+name: Build Palia Share
 
 on:
   push:
@@ -9,7 +9,8 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  android:
+    name: Android APK
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -108,5 +109,49 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: palia-share-debug
+          name: palia-share-android-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
+
+  windows:
+    name: Windows PC
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.44.4'
+          cache: true
+
+      - name: Enable Windows desktop
+        shell: pwsh
+        run: flutter config --enable-windows-desktop
+
+      - name: Generate Windows project
+        shell: pwsh
+        run: flutter create --platforms=windows --project-name=palia_share --org=com.shanpalia .
+
+      - name: Get dependencies
+        shell: pwsh
+        run: flutter pub get
+
+      - name: Analyze
+        shell: pwsh
+        run: flutter analyze
+
+      - name: Build Palia Share for Windows
+        shell: pwsh
+        run: flutter build windows --release
+
+      - name: Package Windows app
+        shell: pwsh
+        run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath Palia-Share-Windows-x64.zip -Force
+
+      - name: Upload Windows app
+        uses: actions/upload-artifact@v4
+        with:
+          name: palia-share-windows-x64
+          path: Palia-Share-Windows-x64.zip
