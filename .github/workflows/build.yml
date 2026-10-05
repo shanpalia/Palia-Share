@@ -15,70 +15,27 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-
       - name: Setup Java 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           flutter-version: '3.44.4'
           cache: true
-
       - name: Generate Android project
         run: |
           flutter create --platforms=android --project-name=palia_share --org=com.shanpalia /tmp/palia_android
           cp -R /tmp/palia_android/android .
-
-      - name: Add About branding
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('lib/main.dart')
-          s = p.read_text()
-          s = s.replace('By PaliaAPK HUB', 'by PaliaWin Store')
-          s = s.replace('Developer by Shanpalia', 'Developer by Shanpalia')
-          p.write_text(s)
-          PY
-
       - name: Configure Android SDK
         run: |
           sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/g' android/app/build.gradle.kts
           sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 36/g' android/app/build.gradle.kts
-
-      - name: Configure round Palia Share launcher icon
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          manifest = Path('android/app/src/main/AndroidManifest.xml')
-          s = manifest.read_text()
-          s = s.replace('android:label="palia_share"', 'android:label="Palia Share"')
-          if 'android:icon=' in s:
-              s = re.sub(r'android:icon="[^"]+"', 'android:icon="@drawable/ic_palia_share"', s, count=1)
-          else:
-              s = s.replace('<application ', '<application android:icon="@drawable/ic_palia_share" ', 1)
-          manifest.write_text(s)
-          icon = Path('android/app/src/main/res/drawable/ic_palia_share.xml')
-          icon.parent.mkdir(parents=True, exist_ok=True)
-          icon.write_text('''<?xml version="1.0" encoding="utf-8"?>
-          <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="512" android:viewportHeight="512">
-              <path android:fillColor="#BCEBDD" android:pathData="M256,12A244,244 0,1 0,256,500A244,244 0,1 0,256,12" />
-              <path android:fillColor="#E9FBF5" android:pathData="M256,24A232,232 0,1 0,256,488A232,232 0,1 0,256,24" />
-              <path android:fillColor="#25323A" android:pathData="M150,104h78v78h-50v148h50v78h-78c-29.8,0 -54,-24.2 -54,-54V158c0,-29.8 24.2,-54 54,-54Z" />
-              <path android:fillColor="#25323A" android:pathData="M362,104h-78v78h50v148h-50v78h78c29.8,0 54,-24.2 54,-54V158c0,-29.8 -24.2,-54 -54,-54Z" />
-              <path android:strokeColor="#28C49A" android:strokeWidth="34" android:strokeLineCap="round" android:fillColor="@android:color/transparent" android:pathData="M158,256L342,256" />
-              <path android:strokeColor="#28C49A" android:strokeWidth="34" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="@android:color/transparent" android:pathData="M294,194L356,256L294,318" />
-          </vector>''')
-          PY
-
       - name: Get dependencies
         run: flutter pub get
-
       - name: Force plugin compileSdk 36
         run: |
           python3 - <<'PY'
@@ -90,16 +47,12 @@ jobs:
                   s = s.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 36').replace('compileSdk flutter.compileSdkVersion', 'compileSdk 36').replace('compileSdk = 34', 'compileSdk = 36').replace('compileSdk 34', 'compileSdk 36')
                   p.write_text(s)
           PY
-
       - name: Remove stale default Flutter test
         run: rm -f test/widget_test.dart
-
       - name: Analyze
         run: flutter analyze
-
       - name: Build debug APK
         run: flutter build apk --debug
-
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
@@ -112,48 +65,43 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           flutter-version: '3.44.4'
           cache: true
-
       - name: Enable Windows desktop
         shell: pwsh
         run: flutter config --enable-windows-desktop
-
       - name: Generate Windows project
         shell: pwsh
         run: flutter create --platforms=windows --project-name=palia_share --org=com.shanpalia .
-
+      - name: Get dependencies
+        shell: pwsh
+        run: flutter pub get
+      - name: Remove stale default Flutter test
+        shell: pwsh
+        run: if (Test-Path test\widget_test.dart) { Remove-Item test\widget_test.dart -Force }
+      - name: Analyze
+        shell: pwsh
+        run: flutter analyze
+      - name: Configure MSVC compatibility
+        shell: pwsh
+        run: |
+          $env:CXXFLAGS = "$env:CXXFLAGS /D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS"
+          $env:CL = "$env:CL /D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS"
+          flutter clean
+          flutter pub get
+          flutter build windows --release
       - name: Apply Palia Share Windows icon
         shell: pwsh
         run: |
           choco install imagemagick --no-progress -y
           magick assets\palia_share_logo.svg -background none -define icon:auto-resize=256,128,64,48,32,16 windows\runner\resources\app_icon.ico
-
-      - name: Get dependencies
-        shell: pwsh
-        run: flutter pub get
-
-      - name: Remove stale default Flutter test
-        shell: pwsh
-        run: if (Test-Path test\widget_test.dart) { Remove-Item test\widget_test.dart -Force }
-
-      - name: Analyze
-        shell: pwsh
-        run: flutter analyze
-
-      - name: Build Palia Share for Windows
-        shell: pwsh
-        run: flutter build windows --release
-
       - name: Package Windows app
         shell: pwsh
         run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath Palia-Share-Windows-x64.zip -Force
-
       - name: Upload Windows app
         uses: actions/upload-artifact@v4
         with:
