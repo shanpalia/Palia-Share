@@ -36,18 +36,37 @@ jobs:
 
       - name: Configure Android 17 build
         run: |
-          # Android API 37 requires AGP 9.1.1+.
-          sed -i -E 's/(com\.android\.application[^:]*:)?[0-9]+\.[0-9]+\.[0-9]+/com.android.application:9.1.1/g' android/settings.gradle
-          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 37/g' android/app/build.gradle.kts
-          sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 37/g' android/app/build.gradle.kts
-          sed -i 's/compileSdk flutter.compileSdkVersion/compileSdk 37/g' android/app/build.gradle
-          sed -i 's/targetSdk flutter.targetSdkVersion/targetSdk 37/g' android/app/build.gradle
-          # AGP 9.1.1 uses Gradle 9.3.1.
-          sed -i 's#gradle-[0-9.]*-all.zip#gradle-9.3.1-all.zip#g' android/gradle/wrapper/gradle-wrapper.properties
-          sed -i 's#gradle-[0-9.]*-bin.zip#gradle-9.3.1-bin.zip#g' android/gradle/wrapper/gradle-wrapper.properties
-          # Keep Flutter 3.44 on the compatible legacy-KGP bridge; do not enable built-in Kotlin yet.
-          if ! grep -q '^android.builtInKotlin=' android/gradle.properties; then echo 'android.builtInKotlin=false' >> android/gradle.properties; fi
-          if ! grep -q '^android.newDsl=' android/gradle.properties; then echo 'android.newDsl=false' >> android/gradle.properties; fi
+          python3 - <<'PY'
+          from pathlib import Path
+          # Flutter 3.44 may generate either Gradle Groovy or Kotlin DSL files.
+          for name in ('android/settings.gradle', 'android/settings.gradle.kts'):
+              p = Path(name)
+              if p.exists():
+                  s = p.read_text()
+                  import re
+                  s = re.sub(r'(com\.android\.application[^\n:]*:)[0-9]+\.[0-9]+\.[0-9]+', r'\g<1>9.1.1', s)
+                  s = re.sub(r'(com\.android\.application[^\n]*version\s*=\s*["\'])[0-9]+\.[0-9]+\.[0-9]+', r'\g<1>9.1.1', s)
+                  p.write_text(s)
+          for name in ('android/app/build.gradle', 'android/app/build.gradle.kts'):
+              p = Path(name)
+              if p.exists():
+                  s = p.read_text()
+                  s = s.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 37')
+                  s = s.replace('compileSdk flutter.compileSdkVersion', 'compileSdk 37')
+                  s = s.replace('targetSdk = flutter.targetSdkVersion', 'targetSdk = 37')
+                  s = s.replace('targetSdk flutter.targetSdkVersion', 'targetSdk 37')
+                  p.write_text(s)
+          p = Path('android/gradle/wrapper/gradle-wrapper.properties')
+          s = p.read_text()
+          import re
+          s = re.sub(r'gradle-[0-9.]+-(?:all|bin)\.zip', lambda m: 'gradle-9.3.1-' + ('all.zip' if 'all' in m.group(0) else 'bin.zip'), s)
+          p.write_text(s)
+          p = Path('android/gradle.properties')
+          s = p.read_text()
+          if 'android.builtInKotlin=' not in s: s += '\nandroid.builtInKotlin=false\n'
+          if 'android.newDsl=' not in s: s += 'android.newDsl=false\n'
+          p.write_text(s)
+          PY
 
       - name: Apply Palia Share icon and Share Sheet
         run: |
@@ -63,17 +82,16 @@ jobs:
           for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do cp android/app/src/main/res/mipmap-$d/ic_launcher.png android/app/src/main/res/mipmap-$d/ic_launcher_round.png; done
           python3 - <<'PY'
           from pathlib import Path
-          import re
           p = Path('android/app/src/main/AndroidManifest.xml')
           s = p.read_text()
           s = s.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"')
           s = s.replace('android:label="palia_share"', 'android:label="Palia Share"')
           if 'android.permission.INTERNET' not in s:
               s = s.replace('</manifest>', '    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />\n    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />\n    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />\n    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" />\n</manifest>')
-          s = s.replace('<application ', '<application android:usesCleartextTraffic="true" ', 1) if 'android:usesCleartextTraffic=' not in s else s
-          s = s.replace('android:launchMode="singleTop"', 'android:launchMode="singleTask"')
+          if 'android:usesCleartextTraffic=' not in s:
+              s = s.replace('<application ', '<application android:usesCleartextTraffic="true" ', 1)
           if 'android:launchMode="singleTask"' not in s:
-              s = s.replace('android:name=".MainActivity"', 'android:name=".MainActivity" android:launchMode="singleTask"', 1)
+              s = s.replace('android:launchMode="singleTop"', 'android:launchMode="singleTask"')
           if 'android.intent.action.SEND_MULTIPLE' not in s:
               filters = '''\n            <intent-filter>\n                <action android:name="android.intent.action.SEND" />\n                <category android:name="android.intent.category.DEFAULT" />\n                <data android:mimeType="*/*" />\n            </intent-filter>\n            <intent-filter>\n                <action android:name="android.intent.action.SEND_MULTIPLE" />\n                <category android:name="android.intent.category.DEFAULT" />\n                <data android:mimeType="*/*" />\n            </intent-filter>'''
               s = s.replace('</activity>', filters + '\n        </activity>', 1)
@@ -88,17 +106,15 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           p = Path('android/app/build.gradle.kts')
-          s = p.read_text()
-          if 'sourceCompatibility = JavaVersion.VERSION_17' not in s:
-              s = s.replace('android {', 'android {\n    compileOptions {\n        sourceCompatibility = JavaVersion.VERSION_17\n        targetCompatibility = JavaVersion.VERSION_17\n    }', 1)
-          p.write_text(s)
+          if p.exists():
+              s = p.read_text()
+              if 'sourceCompatibility = JavaVersion.VERSION_17' not in s:
+                  s = s.replace('android {', 'android {\n    compileOptions {\n        sourceCompatibility = JavaVersion.VERSION_17\n        targetCompatibility = JavaVersion.VERSION_17\n    }', 1)
+              p.write_text(s)
           root = Path('/home/runner/.pub-cache/hosted/pub.dev')
           for p in root.glob('*/android/*'):
               if p.is_file() and p.suffix in {'.gradle', '.kts'}:
-                  s = p.read_text()
-                  s = s.replace('JavaVersion.VERSION_11', 'JavaVersion.VERSION_17')
-                  s = s.replace("jvmTarget = '11'", "jvmTarget = '17'")
-                  s = s.replace('jvmTarget = "11"', 'jvmTarget = "17"')
+                  s = p.read_text().replace('JavaVersion.VERSION_11', 'JavaVersion.VERSION_17').replace("jvmTarget = '11'", "jvmTarget = '17'").replace('jvmTarget = "11"', 'jvmTarget = "17"')
                   p.write_text(s)
           PY
 
