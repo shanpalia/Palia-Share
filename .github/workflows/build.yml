@@ -34,12 +34,22 @@ jobs:
           flutter create --platforms=android --project-name=palia_share --org=com.shanpalia /tmp/palia_android
           cp -R /tmp/palia_android/android .
 
-      - name: Configure Android SDK
+      - name: Configure Android 17 build
         run: |
-          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/g' android/app/build.gradle.kts
-          sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 36/g' android/app/build.gradle.kts
+          # Android API 37 requires AGP 9.1.1+.
+          sed -i -E 's/(com\.android\.application[^:]*:)?[0-9]+\.[0-9]+\.[0-9]+/com.android.application:9.1.1/g' android/settings.gradle
+          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 37/g' android/app/build.gradle.kts
+          sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 37/g' android/app/build.gradle.kts
+          sed -i 's/compileSdk flutter.compileSdkVersion/compileSdk 37/g' android/app/build.gradle
+          sed -i 's/targetSdk flutter.targetSdkVersion/targetSdk 37/g' android/app/build.gradle
+          # AGP 9.1.1 uses Gradle 9.3.1.
+          sed -i 's#gradle-[0-9.]*-all.zip#gradle-9.3.1-all.zip#g' android/gradle/wrapper/gradle-wrapper.properties
+          sed -i 's#gradle-[0-9.]*-bin.zip#gradle-9.3.1-bin.zip#g' android/gradle/wrapper/gradle-wrapper.properties
+          # Keep Flutter 3.44 on the compatible legacy-KGP bridge; do not enable built-in Kotlin yet.
+          if ! grep -q '^android.builtInKotlin=' android/gradle.properties; then echo 'android.builtInKotlin=false' >> android/gradle.properties; fi
+          if ! grep -q '^android.newDsl=' android/gradle.properties; then echo 'android.newDsl=false' >> android/gradle.properties; fi
 
-      - name: Apply Palia Share icon
+      - name: Apply Palia Share icon and Share Sheet
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y imagemagick
@@ -53,79 +63,35 @@ jobs:
           for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do cp android/app/src/main/res/mipmap-$d/ic_launcher.png android/app/src/main/res/mipmap-$d/ic_launcher_round.png; done
           python3 - <<'PY'
           from pathlib import Path
+          import re
           p = Path('android/app/src/main/AndroidManifest.xml')
           s = p.read_text()
           s = s.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"')
           s = s.replace('android:label="palia_share"', 'android:label="Palia Share"')
-          p.write_text(s)
-          PY
-
-      - name: Configure Android permissions and Share Sheet
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          p = Path('android/app/src/main/AndroidManifest.xml')
-          s = p.read_text()
-          permissions = '''    <uses-permission android:name="android.permission.INTERNET" />
-              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-              <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-              <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
-              <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" />'''
           if 'android.permission.INTERNET' not in s:
-              s = re.sub(r'(<manifest\\b[^>]*>)', r'\\1\\n' + permissions, s, count=1)
-          else:
-              missing = [line for line in permissions.splitlines() if line.strip() and line.strip() not in s]
-              if missing:
-                  s = s.replace('\\n    <application', '\\n' + '\\n'.join(missing) + '\\n    <application', 1)
-          if 'android:usesCleartextTraffic=' not in s:
-              s = s.replace('<application ', '<application android:usesCleartextTraffic="true" ', 1)
+              s = s.replace('</manifest>', '    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />\n    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />\n    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />\n    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" />\n</manifest>')
+          s = s.replace('<application ', '<application android:usesCleartextTraffic="true" ', 1) if 'android:usesCleartextTraffic=' not in s else s
+          s = s.replace('android:launchMode="singleTop"', 'android:launchMode="singleTask"')
+          if 'android:launchMode="singleTask"' not in s:
+              s = s.replace('android:name=".MainActivity"', 'android:name=".MainActivity" android:launchMode="singleTask"', 1)
           if 'android.intent.action.SEND_MULTIPLE' not in s:
-              s = s.replace('android:launchMode="singleTop"', 'android:launchMode="singleTask"', 1)
-              if 'android:launchMode="singleTask"' not in s:
-                  s = s.replace('android:name=".MainActivity"', 'android:name=".MainActivity" android:launchMode="singleTask"', 1)
-              filters = '''
-              <intent-filter>
-                  <action android:name="android.intent.action.SEND" />
-                  <category android:name="android.intent.category.DEFAULT" />
-                  <data android:mimeType="*/*" />
-              </intent-filter>
-              <intent-filter>
-                  <action android:name="android.intent.action.SEND_MULTIPLE" />
-                  <category android:name="android.intent.category.DEFAULT" />
-                  <data android:mimeType="*/*" />
-              </intent-filter>'''
-              s = s.replace('\\n        </activity>', filters + '\\n        </activity>', 1)
+              filters = '''\n            <intent-filter>\n                <action android:name="android.intent.action.SEND" />\n                <category android:name="android.intent.category.DEFAULT" />\n                <data android:mimeType="*/*" />\n            </intent-filter>\n            <intent-filter>\n                <action android:name="android.intent.action.SEND_MULTIPLE" />\n                <category android:name="android.intent.category.DEFAULT" />\n                <data android:mimeType="*/*" />\n            </intent-filter>'''
+              s = s.replace('</activity>', filters + '\n        </activity>', 1)
           p.write_text(s)
           PY
 
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Force plugin compileSdk 36
+      - name: Align Android JVM targets
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          root = Path('/home/runner/.pub-cache/hosted/pub.dev')
-          for p in root.glob('*/android/*'):
-              if p.is_file() and p.suffix in {'.gradle', '.kts'}:
-                  s = p.read_text()
-                  s = s.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 36').replace('compileSdk flutter.compileSdkVersion', 'compileSdk 36').replace('compileSdk = 34', 'compileSdk = 36').replace('compileSdk 34', 'compileSdk 36')
-                  p.write_text(s)
-          PY
-
-      - name: Align all Android subproject JVM targets
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('android/build.gradle.kts')
+          p = Path('android/app/build.gradle.kts')
           s = p.read_text()
-          block = '''\n\n// Keep Java and Kotlin bytecode targets identical for all Flutter plugins.\nsubprojects {\n    tasks.withType<org.gradle.api.tasks.compile.JavaCompile>().configureEach {\n        sourceCompatibility = "17"\n        targetCompatibility = "17"\n    }\n    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {\n        compilerOptions {\n            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)\n        }\n    }\n}\n'''
-          if 'Align all Android subproject JVM targets' not in s:
-              p.write_text(s + block)
-          PY
-          python3 - <<'PY'
-          from pathlib import Path
+          if 'sourceCompatibility = JavaVersion.VERSION_17' not in s:
+              s = s.replace('android {', 'android {\n    compileOptions {\n        sourceCompatibility = JavaVersion.VERSION_17\n        targetCompatibility = JavaVersion.VERSION_17\n    }', 1)
+          p.write_text(s)
           root = Path('/home/runner/.pub-cache/hosted/pub.dev')
           for p in root.glob('*/android/*'):
               if p.is_file() and p.suffix in {'.gradle', '.kts'}:
@@ -134,14 +100,6 @@ jobs:
                   s = s.replace("jvmTarget = '11'", "jvmTarget = '17'")
                   s = s.replace('jvmTarget = "11"', 'jvmTarget = "17"')
                   p.write_text(s)
-          PY
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('android/app/build.gradle.kts')
-          s = p.read_text()
-          if 'sourceCompatibility = JavaVersion.VERSION_17' not in s:
-              s = s.replace('android {', 'android {\n    compileOptions {\n        sourceCompatibility = JavaVersion.VERSION_17\n        targetCompatibility = JavaVersion.VERSION_17\n    }', 1)
-          p.write_text(s)
           PY
 
       - name: Remove stale default Flutter test
@@ -158,52 +116,3 @@ jobs:
         with:
           name: palia-share-android-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
-
-  windows:
-    name: Windows PC
-    runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          flutter-version: '3.44.4'
-          cache: true
-      - name: Enable Windows desktop
-        shell: pwsh
-        run: flutter config --enable-windows-desktop
-      - name: Generate Windows project
-        shell: pwsh
-        run: flutter create --platforms=windows --project-name=palia_share --org=com.shanpalia .
-      - name: Apply Palia Share Windows icon
-        shell: pwsh
-        run: |
-          choco install imagemagick --no-progress -y
-          magick assets\palia_share_logo.svg -background none -define icon:auto-resize=256,128,64,48,32,16 windows\runner\resources\app_icon.ico
-      - name: Get dependencies
-        shell: pwsh
-        run: flutter pub get
-      - name: Remove stale default Flutter test
-        shell: pwsh
-        run: if (Test-Path test\widget_test.dart) { Remove-Item test\widget_test.dart -Force }
-      - name: Analyze
-        shell: pwsh
-        run: flutter analyze
-      - name: Configure MSVC compatibility
-        shell: pwsh
-        run: |
-          $env:CXXFLAGS = "$env:CXXFLAGS /D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS"
-          $env:CL = "$env:CL /D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS"
-          flutter clean
-          flutter pub get
-          flutter build windows --release
-      - name: Package Windows app
-        shell: pwsh
-        run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath Palia-Share-Windows-x64.zip -Force
-      - name: Upload Windows app
-        uses: actions/upload-artifact@v4
-        with:
-          name: palia-share-windows-x64
-          path: Palia-Share-Windows-x64.zip
