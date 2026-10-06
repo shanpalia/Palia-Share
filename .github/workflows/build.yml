@@ -34,6 +34,32 @@ jobs:
         run: |
           sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/g' android/app/build.gradle.kts
           sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 36/g' android/app/build.gradle.kts
+      - name: Apply Palia Share Android icon
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y imagemagick
+          mkdir -p android/app/src/main/res/mipmap-mdpi
+          mkdir -p android/app/src/main/res/mipmap-hdpi
+          mkdir -p android/app/src/main/res/mipmap-xhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+          magick assets/palia_share_logo.svg -background none -resize 48x48 android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          magick assets/palia_share_logo.svg -background none -resize 72x72 android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          magick assets/palia_share_logo.svg -background none -resize 96x96 android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          magick assets/palia_share_logo.svg -background none -resize 144x144 android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          magick assets/palia_share_logo.svg -background none -resize 192x192 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
+          cp android/app/src/main/res/mipmap-hdpi/ic_launcher.png android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
+          cp android/app/src/main/res/mipmap-xhdpi/ic_launcher.png android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
+          cp android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
+          cp android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android/app/src/main/AndroidManifest.xml')
+          s = p.read_text()
+          s = s.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"')
+          p.write_text(s)
+          PY
       - name: Configure Android local network access
         run: |
           python3 - <<'PY'
@@ -47,7 +73,7 @@ jobs:
               <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" />
           '''
           if 'android.permission.INTERNET' not in s:
-              s = s.replace('<manifest', '<manifest', 1).replace('>', '>\n' + permissions, 1)
+              s = s.replace('>', '>\n' + permissions, 1)
           else:
               missing = []
               for line in permissions.splitlines():
