@@ -59,6 +59,7 @@ jobs:
           p = Path('android/app/src/main/AndroidManifest.xml')
           s = p.read_text()
           s = s.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"')
+          s = s.replace('android:label="palia_share"', 'android:label="Palia Share"')
           p.write_text(s)
           PY
       - name: Configure Android local network access
@@ -83,6 +84,35 @@ jobs:
               if missing:
                   s = s.replace('\n    <application', '\n' + '\n'.join(missing) + '\n    <application', 1)
           s = s.replace('<application ', '<application android:usesCleartextTraffic="true" ', 1)
+          p.write_text(s)
+          PY
+      - name: Configure Android system Share Sheet
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android/app/src/main/AndroidManifest.xml')
+          s = p.read_text()
+          if 'android.intent.action.SEND_MULTIPLE' not in s:
+              s = s.replace('android:launchMode="singleTop"', 'android:launchMode="singleTask"', 1)
+              if 'android:launchMode="singleTask"' not in s:
+                  s = s.replace('android:name=".MainActivity"', 'android:name=".MainActivity" android:launchMode="singleTask"', 1)
+              filters = '''
+              <intent-filter>
+                  <action android:name="android.intent.action.SEND" />
+                  <category android:name="android.intent.category.DEFAULT" />
+                  <data android:mimeType="*/*" />
+              </intent-filter>
+              <intent-filter>
+                  <action android:name="android.intent.action.SEND_MULTIPLE" />
+                  <category android:name="android.intent.category.DEFAULT" />
+                  <data android:mimeType="*/*" />
+              </intent-filter>
+              <intent-filter>
+                  <action android:name="android.intent.action.VIEW" />
+                  <category android:name="android.intent.category.DEFAULT" />
+                  <data android:scheme="content" android:mimeType="*/*" />
+              </intent-filter>'''
+              s = s.replace('\n        </activity>', filters + '\n        </activity>', 1)
           p.write_text(s)
           PY
       - name: Get dependencies
