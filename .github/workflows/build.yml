@@ -73,14 +73,14 @@ jobs:
               <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
               <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" />'''
           if 'android.permission.INTERNET' not in s:
-              s = re.sub(r'(<manifest\\b[^>]*>)', r'\\1\\n' + permissions, s, count=1)
+              s = re.sub(r'(<manifest\b[^>]*>)', r'\1\n' + permissions, s, count=1)
           else:
               missing = []
               for line in permissions.splitlines():
                   if line.strip() and line.strip() not in s:
                       missing.append(line)
               if missing:
-                  s = s.replace('\\n    <application', '\\n' + '\\n'.join(missing) + '\\n    <application', 1)
+                  s = s.replace('\n    <application', '\n' + '\n'.join(missing) + '\n    <application', 1)
           s = s.replace('<application ', '<application android:usesCleartextTraffic="true" ', 1)
           p.write_text(s)
           PY
