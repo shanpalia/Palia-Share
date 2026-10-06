@@ -114,8 +114,16 @@ jobs:
                   p.write_text(s)
           PY
 
-      - name: Align Android Java and Kotlin targets
+      - name: Align all Android subproject JVM targets
         run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android/build.gradle.kts')
+          s = p.read_text()
+          block = '''\n\n// Keep Java and Kotlin bytecode targets identical for all Flutter plugins.\nsubprojects {\n    tasks.withType<org.gradle.api.tasks.compile.JavaCompile>().configureEach {\n        sourceCompatibility = "17"\n        targetCompatibility = "17"\n    }\n    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {\n        compilerOptions {\n            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)\n        }\n    }\n}\n'''
+          if 'Align all Android subproject JVM targets' not in s:
+              p.write_text(s + block)
+          PY
           python3 - <<'PY'
           from pathlib import Path
           root = Path('/home/runner/.pub-cache/hosted/pub.dev')
