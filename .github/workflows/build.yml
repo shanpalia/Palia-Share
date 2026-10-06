@@ -15,26 +15,31 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
       - name: Setup Java 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           flutter-version: '3.44.4'
           cache: true
+
       - name: Generate Android project
         run: |
           flutter create --platforms=android --project-name=palia_share --org=com.shanpalia /tmp/palia_android
           cp -R /tmp/palia_android/android .
+
       - name: Configure Android SDK
         run: |
           sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/g' android/app/build.gradle.kts
           sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 36/g' android/app/build.gradle.kts
-      - name: Apply Palia Share Android icon
+
+      - name: Apply Palia Share icon
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y imagemagick
@@ -45,11 +50,7 @@ jobs:
           convert assets/palia_share_logo.svg -background none -resize 96x96 android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
           convert assets/palia_share_logo.svg -background none -resize 144x144 android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
           convert assets/palia_share_logo.svg -background none -resize 192x192 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-          cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
-          cp android/app/src/main/res/mipmap-hdpi/ic_launcher.png android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
-          cp android/app/src/main/res/mipmap-xhdpi/ic_launcher.png android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
-          cp android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
-          cp android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+          for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do cp android/app/src/main/res/mipmap-$d/ic_launcher.png android/app/src/main/res/mipmap-$d/ic_launcher_round.png; done
           python3 - <<'PY'
           from pathlib import Path
           p = Path('android/app/src/main/AndroidManifest.xml')
@@ -58,7 +59,8 @@ jobs:
           s = s.replace('android:label="palia_share"', 'android:label="Palia Share"')
           p.write_text(s)
           PY
-      - name: Configure Android local network access
+
+      - name: Configure Android permissions and Share Sheet
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -71,20 +73,13 @@ jobs:
               <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
               <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" />'''
           if 'android.permission.INTERNET' not in s:
-              s = re.sub(r'(<manifest\b[^>]*>)', r'\1\n' + permissions, s, count=1)
+              s = re.sub(r'(<manifest\\b[^>]*>)', r'\\1\\n' + permissions, s, count=1)
           else:
               missing = [line for line in permissions.splitlines() if line.strip() and line.strip() not in s]
               if missing:
-                  s = s.replace('\n    <application', '\n' + '\n'.join(missing) + '\n    <application', 1)
-          s = s.replace('<application ', '<application android:usesCleartextTraffic="true" ', 1)
-          p.write_text(s)
-          PY
-      - name: Configure Android system Share Sheet
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('android/app/src/main/AndroidManifest.xml')
-          s = p.read_text()
+                  s = s.replace('\\n    <application', '\\n' + '\\n'.join(missing) + '\\n    <application', 1)
+          if 'android:usesCleartextTraffic=' not in s:
+              s = s.replace('<application ', '<application android:usesCleartextTraffic="true" ', 1)
           if 'android.intent.action.SEND_MULTIPLE' not in s:
               s = s.replace('android:launchMode="singleTop"', 'android:launchMode="singleTask"', 1)
               if 'android:launchMode="singleTask"' not in s:
@@ -99,17 +94,14 @@ jobs:
                   <action android:name="android.intent.action.SEND_MULTIPLE" />
                   <category android:name="android.intent.category.DEFAULT" />
                   <data android:mimeType="*/*" />
-              </intent-filter>
-              <intent-filter>
-                  <action android:name="android.intent.action.VIEW" />
-                  <category android:name="android.intent.category.DEFAULT" />
-                  <data android:scheme="content" android:mimeType="*/*" />
               </intent-filter>'''
-              s = s.replace('\n        </activity>', filters + '\n        </activity>', 1)
+              s = s.replace('\\n        </activity>', filters + '\\n        </activity>', 1)
           p.write_text(s)
           PY
+
       - name: Get dependencies
         run: flutter pub get
+
       - name: Force plugin compileSdk 36
         run: |
           python3 - <<'PY'
@@ -121,12 +113,38 @@ jobs:
                   s = s.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 36').replace('compileSdk flutter.compileSdkVersion', 'compileSdk 36').replace('compileSdk = 34', 'compileSdk = 36').replace('compileSdk 34', 'compileSdk 36')
                   p.write_text(s)
           PY
+
+      - name: Align Android Java and Kotlin targets
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path('/home/runner/.pub-cache/hosted/pub.dev')
+          for p in root.glob('*/android/*'):
+              if p.is_file() and p.suffix in {'.gradle', '.kts'}:
+                  s = p.read_text()
+                  s = s.replace('JavaVersion.VERSION_11', 'JavaVersion.VERSION_17')
+                  s = s.replace("jvmTarget = '11'", "jvmTarget = '17'")
+                  s = s.replace('jvmTarget = "11"', 'jvmTarget = "17"')
+                  p.write_text(s)
+          PY
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android/app/build.gradle.kts')
+          s = p.read_text()
+          if 'sourceCompatibility = JavaVersion.VERSION_17' not in s:
+              s = s.replace('android {', 'android {\n    compileOptions {\n        sourceCompatibility = JavaVersion.VERSION_17\n        targetCompatibility = JavaVersion.VERSION_17\n    }', 1)
+          p.write_text(s)
+          PY
+
       - name: Remove stale default Flutter test
         run: rm -f test/widget_test.dart
+
       - name: Analyze
         run: flutter analyze
+
       - name: Build debug APK
         run: flutter build apk --debug
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
